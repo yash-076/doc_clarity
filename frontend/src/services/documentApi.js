@@ -62,23 +62,36 @@ export const documentApi = {
     return response.data;
   },
 
-  async askDocument(id, question, topK = 5) {
+  async askDocument(id, question, persona = 'consumer', topK = 5) {
     const response = await apiClient.post(`/documents/${id}/ask`, {
       question,
+      persona,
       top_k: topK,
     });
     return response.data;
   },
 
-  async analyzeDocument(id, forceRefresh = false) {
+  async reexplainDocument(id, question, persona = 'consumer', sourceChunkIds = null) {
+    const response = await apiClient.post(`/documents/${id}/explain`, {
+      question,
+      persona,
+      source_chunk_ids: sourceChunkIds,
+    });
+    return response.data;
+  },
+
+  async analyzeDocument(id, persona = 'consumer', forceRefresh = false) {
     const response = await apiClient.post(`/documents/${id}/analyze`, {
+      persona,
       force_refresh: forceRefresh,
     });
     return response.data;
   },
 
-  async fetchDocumentAnalysis(id) {
-    const response = await apiClient.get(`/documents/${id}/analysis`);
+  async fetchDocumentAnalysis(id, persona = 'consumer') {
+    const response = await apiClient.get(`/documents/${id}/analysis`, {
+      params: { persona },
+    });
     return response.data;
   },
 
@@ -104,16 +117,18 @@ export const documentApi = {
     return response.data;
   },
 
-  async createConversation(id, title = null) {
+  async createConversation(id, title = null, persona = 'consumer') {
     const response = await apiClient.post(`/documents/${id}/conversations`, {
       title,
+      persona,
     });
     return response.data;
   },
 
-  async sendConversationMessage(conversationId, content) {
+  async sendConversationMessage(conversationId, content, persona = null) {
     const response = await apiClient.post(`/conversations/${conversationId}/messages`, {
       content,
+      persona,
     });
     return response.data;
   },

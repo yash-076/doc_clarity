@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.personas import PersonaType, ensure_persona
 from app.db.models.document import Document, DocumentStatus, EmbeddingStatus
 from app.db.models.document_analysis import DocumentAnalysis
 from app.schemas.analysis import (
@@ -53,15 +54,12 @@ class DocumentAnalysisService:
         self,
         db: Session,
         document_id: uuid.UUID,
+        persona: Optional[str | PersonaType] = PersonaType.CONSUMER,
         force_refresh: bool = False,
     ) -> DocumentAnalysisResponse:
-        """Retrieves cached analysis or generates a new one.
-        
-        Args:
-            db: Database session.
-            document_id: Target document ID.
-            force_refresh: If True, forces fresh LLM analysis and updates database.
-        """
+        """Retrieves cached analysis or generates a new one."""
+        persona_enum = ensure_persona(persona)
+
         # 1. Validate Document
         document = db.query(Document).filter(Document.id == document_id).first()
         if not document:
@@ -91,8 +89,8 @@ class DocumentAnalysisService:
                 .first()
             )
             if cached_analysis and not cached_analysis.is_stale:
-                logger.info(f"Returning cached document analysis for document_id={document_id}")
-                return self._build_response(cached_analysis, document.document_type)
+                logger.info(f"Returning cached document analysis for document_id={document_id}, persona={persona_enum.value}")
+                return self._build_response(cached_analysis, document.document_type, persona_enum)
 
         # 3. Perform Targeted Multi-Query Retrieval
         logger.info(f"Generating fresh analysis for document_id={document_id} (force_refresh={force_refresh})")
@@ -152,10 +150,16 @@ class DocumentAnalysisService:
         db.commit()
         db.refresh(analysis_record)
 
-        return self._build_response(analysis_record, document.document_type)
+        return self._build_response(analysis_record, document.document_type, persona_enum)
 
-    def get_existing_analysis(self, db: Session, document_id: uuid.UUID) -> DocumentAnalysisResponse:
+    def get_existing_analysis(
+        self,
+        db: Session,
+        document_id: uuid.UUID,
+        persona: Optional[str | PersonaType] = PersonaType.CONSUMER,
+    ) -> DocumentAnalysisResponse:
         """Retrieves existing cached analysis without generating a new one."""
+        persona_enum = ensure_persona(persona)
         document = db.query(Document).filter(Document.id == document_id).first()
         if not document:
             raise HTTPException(
@@ -175,7 +179,7 @@ class DocumentAnalysisService:
                 detail=f"No analysis record found for document ID {document_id}."
             )
 
-        return self._build_response(analysis, document.document_type)
+        return self._build_response(analysis, document.document_type, persona_enum)
 
     def mark_stale(self, db: Session, document_id: uuid.UUID) -> None:
         """Marks document analysis as stale when document text/chunks/indexing change."""
@@ -209,7 +213,6 @@ class DocumentAnalysisService:
                 if cid not in chunk_dict or res.score > chunk_dict[cid].score:
                     chunk_dict[cid] = res
 
-        # Sort deduplicated chunks by score DESC
         sorted_results = sorted(chunk_dict.values(), key=lambda r: r.score, reverse=True)
         sorted_results = sorted_results[:settings.ANALYSIS_MAX_CHUNKS]
 
@@ -219,7 +222,6 @@ class DocumentAnalysisService:
 
         for idx, res in enumerate(sorted_results, start=1):
             source_id = f"SOURCE_{idx}"
-            cid_str = str(res.chunk_id)
 
             block = {
                 "source_id": source_id,
@@ -332,7 +334,6 @@ Analyze the document context above and return a single JSON object with the foll
             return json.loads(cleaned)
         except Exception as e:
             logger.error(f"Failed to parse LLM JSON: {str(e)}\nRaw output: {raw_text[:200]}")
-            # Fallback structure
             return {
                 "summary": raw_text[:500],
                 "key_points": [],
@@ -375,8 +376,13 @@ Analyze the document context above and return a single JSON object with the foll
         }
         return mapped
 
-    def _build_response(self, record: DocumentAnalysis, document_type: str) -> DocumentAnalysisResponse:
-        """Converts DocumentAnalysis ORM record to DocumentAnalysisResponse Pydantic schema."""
+    def _build_response(
+        self,
+        record: DocumentAnalysis,
+        document_type: str,
+        persona: PersonaType = PersonaType.CONSUMER,
+    ) -> DocumentAnalysisResponse:
+        """Converts DocumentAnalysis ORM record to DocumentAnalysisResponse Pydantic schema with persona formatting."""
         data = record.analysis_json or {}
 
         def parse_citations(c_list: list) -> list[Citation]:
@@ -467,6 +473,7 @@ Analyze the document context above and return a single JSON object with the foll
             id=record.id,
             document_id=record.document_id,
             document_type=document_type,
+            persona=persona,
             summary=record.summary,
             key_points=key_points,
             important_dates=important_dates,

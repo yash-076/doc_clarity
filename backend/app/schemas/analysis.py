@@ -3,8 +3,15 @@ from typing import Optional, Literal, List
 from pydantic import BaseModel, Field, ConfigDict
 
 
+from app.core.personas import PersonaType
+
+
 class AnalysisRequest(BaseModel):
     """Schema for requesting document analysis."""
+    persona: Optional[PersonaType] = Field(
+        default=PersonaType.CONSUMER,
+        description="Explanation persona style (consumer, professional, business)."
+    )
     force_refresh: bool = Field(
         default=False,
         description="If true, forces re-generation of analysis even if cached analysis exists."
@@ -79,6 +86,7 @@ class DocumentAnalysisResponse(BaseModel):
     id: uuid.UUID = Field(..., description="Unique ID of the analysis record.")
     document_id: uuid.UUID = Field(..., description="Target document ID.")
     document_type: str = Field(..., description="Domain type of document (legal, insurance, medical, other).")
+    persona: PersonaType = Field(default=PersonaType.CONSUMER, description="Explanation persona style.")
     summary: str = Field(..., description="Executive summary (150-300 words).")
     key_points: List[KeyPoint] = Field(default_factory=list)
     important_dates: List[ImportantDate] = Field(default_factory=list)

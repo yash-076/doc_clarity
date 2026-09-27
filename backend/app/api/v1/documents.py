@@ -15,9 +15,11 @@ from app.schemas.retrieval import (
     RetrievalResponse,
     IndexStatusResponse
 )
+from app.core.personas import PersonaType
 from app.schemas.rag import (
     RAGQuestionRequest,
-    RAGAnswerResponse
+    RAGAnswerResponse,
+    ReexplainRequest,
 )
 from app.schemas.analysis import (
     AnalysisRequest,
@@ -143,7 +145,7 @@ def get_document_chunks(document_id: uuid.UUID, db: Session = Depends(get_db)):
     response_model=RAGAnswerResponse,
     status_code=status.HTTP_200_OK,
     summary="Ask a question about a specific document (RAG + Gemini)",
-    description="Embeds user question, retrieves relevant document chunks, constructs grounded context with prompt injection protection, and generates grounded answer with Gemini LLM."
+    description="Embeds user question, retrieves relevant document chunks, constructs grounded context with persona instructions, and generates grounded answer with Gemini LLM."
 )
 async def ask_document(
     document_id: uuid.UUID,
@@ -155,7 +157,29 @@ async def ask_document(
         db=db,
         document_id=document_id,
         question=req.question,
+        persona=req.persona,
         top_k=req.top_k,
+    )
+
+@router.post(
+    "/{document_id}/explain",
+    response_model=RAGAnswerResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Re-explain an existing answer or question in a different persona style",
+    description="Re-explains document evidence using a target persona (consumer, professional, business) without re-running vector retrieval when source chunks are provided."
+)
+async def reexplain_document(
+    document_id: uuid.UUID,
+    req: ReexplainRequest,
+    db: Session = Depends(get_db)
+):
+    rag_service = RAGService()
+    return await rag_service.reexplain_question(
+        db=db,
+        document_id=document_id,
+        question=req.question,
+        persona=req.persona,
+        source_chunk_ids=req.source_chunk_ids,
     )
 
 @router.post(
@@ -171,10 +195,12 @@ async def analyze_document(
     db: Session = Depends(get_db)
 ):
     force_refresh = req.force_refresh if req else False
+    persona = req.persona if req else PersonaType.CONSUMER
     analysis_service = DocumentAnalysisService()
     return await analysis_service.get_or_create_analysis(
         db=db,
         document_id=document_id,
+        persona=persona,
         force_refresh=force_refresh
     )
 
@@ -183,14 +209,15 @@ async def analyze_document(
     response_model=DocumentAnalysisResponse,
     status_code=status.HTTP_200_OK,
     summary="Get cached document analysis",
-    description="Retrieves existing cached document analysis from PostgreSQL without calling LLM."
+    description="Retrieves existing cached document analysis from PostgreSQL formatted for the requested persona style."
 )
 def get_document_analysis(
     document_id: uuid.UUID,
+    persona: PersonaType = PersonaType.CONSUMER,
     db: Session = Depends(get_db)
 ):
     analysis_service = DocumentAnalysisService()
-    return analysis_service.get_existing_analysis(db=db, document_id=document_id)
+    return analysis_service.get_existing_analysis(db=db, document_id=document_id, persona=persona)
 
 @router.post(
     "/{document_id}/suggested-questions",
@@ -239,11 +266,13 @@ def create_conversation(
     db: Session = Depends(get_db)
 ):
     title = req.title if req else None
+    persona = req.persona if req else PersonaType.CONSUMER
     conv_service = ConversationService()
     return conv_service.create_conversation(
         db=db,
         document_id=document_id,
-        title=title
+        title=title,
+        persona=persona,
     )
 
 @router.delete(

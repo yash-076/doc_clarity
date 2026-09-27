@@ -29,7 +29,8 @@ async def send_message(
     return await service.send_message(
         db=db,
         conversation_id=conversation_id,
-        content=req.content
+        content=req.content,
+        persona=req.persona,
     )
 
 

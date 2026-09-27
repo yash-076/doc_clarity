@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileSearch, RefreshCw, Loader2, AlertTriangle, Calendar, DollarSign, ShieldAlert, CheckCircle2, FileText, UserCheck, AlertCircle, Info, Tag } from 'lucide-react';
 import { documentApi } from '../services/documentApi';
+import PersonaSelector from './PersonaSelector';
 
 export default function DocumentAnalysisModal({ document, onClose, onSelectQuestion }) {
   const [analysis, setAnalysis] = useState(null);
   const [suggestedQuestions, setSuggestedQuestions] = useState([]);
+  const [selectedPersona, setSelectedPersona] = useState('consumer');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -12,7 +14,7 @@ export default function DocumentAnalysisModal({ document, onClose, onSelectQuest
 
   if (!document) return null;
 
-  const loadAnalysis = async (forceRefresh = false) => {
+  const loadAnalysis = async (personaToUse = selectedPersona, forceRefresh = false) => {
     if (forceRefresh) {
       setRefreshing(true);
     } else {
@@ -21,7 +23,7 @@ export default function DocumentAnalysisModal({ document, onClose, onSelectQuest
     setError(null);
 
     try {
-      const data = await documentApi.analyzeDocument(document.id, forceRefresh);
+      const data = await documentApi.analyzeDocument(document.id, personaToUse, forceRefresh);
       setAnalysis(data);
 
       try {
@@ -39,8 +41,8 @@ export default function DocumentAnalysisModal({ document, onClose, onSelectQuest
   };
 
   useEffect(() => {
-    loadAnalysis(false);
-  }, [document.id]);
+    loadAnalysis(selectedPersona, false);
+  }, [document.id, selectedPersona]);
 
   const getSeverityBadge = (severity) => {
     switch (severity?.toLowerCase()) {
@@ -175,6 +177,11 @@ export default function DocumentAnalysisModal({ document, onClose, onSelectQuest
             <ShieldAlert className="w-3.5 h-3.5" />
             Exclusions ({analysis?.exclusions?.length || 0})
           </button>
+        </div>
+
+        {/* Persona Selector Bar */}
+        <div className="px-6 py-3 bg-slate-900/60 border-b border-slate-800 shrink-0">
+          <PersonaSelector selectedPersona={selectedPersona} onChange={setSelectedPersona} />
         </div>
 
         {/* Body Content */}
