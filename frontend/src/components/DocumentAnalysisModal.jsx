@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { X, FileSearch, RefreshCw, Loader2, AlertTriangle, Calendar, DollarSign, ShieldAlert, CheckCircle2, FileText, UserCheck, AlertCircle, Info, Tag } from 'lucide-react';
 import { documentApi } from '../services/documentApi';
 
-export default function DocumentAnalysisModal({ document, onClose }) {
+export default function DocumentAnalysisModal({ document, onClose, onSelectQuestion }) {
   const [analysis, setAnalysis] = useState(null);
+  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -22,6 +23,13 @@ export default function DocumentAnalysisModal({ document, onClose }) {
     try {
       const data = await documentApi.analyzeDocument(document.id, forceRefresh);
       setAnalysis(data);
+
+      try {
+        const qData = await documentApi.generateSuggestedQuestions(document.id, forceRefresh);
+        setSuggestedQuestions(qData?.questions || []);
+      } catch (qErr) {
+        console.warn("Could not fetch suggested questions:", qErr);
+      }
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to generate document analysis.");
     } finally {
@@ -198,19 +206,50 @@ export default function DocumentAnalysisModal({ document, onClose }) {
             <div className="space-y-6 animate-fadeIn">
               {/* SUMMARY TAB */}
               {activeTab === 'summary' && (
-                <div className="p-6 bg-slate-900/70 border border-slate-800 rounded-2xl space-y-4 shadow-lg">
-                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-400" />
-                      Executive Summary
-                    </h4>
-                    <span className="text-xs text-slate-500 font-mono">
-                      Model: {analysis.llm_model || 'Gemini'}
-                    </span>
+                <div className="space-y-6">
+                  <div className="p-6 bg-slate-900/70 border border-slate-800 rounded-2xl space-y-4 shadow-lg">
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-blue-400" />
+                        Executive Summary
+                      </h4>
+                      <span className="text-xs text-slate-500 font-mono">
+                        Model: {analysis.llm_model || 'Gemini'}
+                      </span>
+                    </div>
+                    <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap font-sans">
+                      {analysis.summary}
+                    </p>
                   </div>
-                  <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap font-sans">
-                    {analysis.summary}
-                  </p>
+
+                  {/* Suggested Questions Section */}
+                  {suggestedQuestions && suggestedQuestions.length > 0 && (
+                    <div className="p-6 bg-slate-900/70 border border-slate-800 rounded-2xl space-y-3 shadow-lg">
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Tag className="w-4 h-4 text-purple-400" />
+                        Proactive Suggested Questions
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        Select a question below to launch grounded multi-turn Q&A for this document:
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {suggestedQuestions.map((q) => (
+                          <button
+                            key={q.id}
+                            onClick={() => {
+                              if (onSelectQuestion) {
+                                onSelectQuestion(q.question);
+                              }
+                            }}
+                            className="text-xs bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 px-3 py-2 rounded-xl border border-purple-500/30 transition-all text-left max-w-sm truncate"
+                          >
+                            <span className="font-semibold text-purple-400 mr-1.5 capitalize">[{q.category}]</span>
+                            {q.question}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

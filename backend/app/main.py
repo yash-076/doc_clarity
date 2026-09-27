@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from app.core.config import settings
 from app.core.logging import setup_logging, logger
 from app.api.v1.documents import router as documents_router
+from app.api.v1.conversations import router as conversations_router
 from app.db.database import engine, Base
 
 # Setup structured logging
@@ -28,7 +29,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Doc Clarity — GenAI Document Intelligence Platform API (Phase 1: Upload & Management)",
+    description="Doc Clarity — GenAI Document Intelligence Platform API",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan
@@ -50,6 +51,7 @@ app.add_middleware(
 
 # Register API v1 Routers
 app.include_router(documents_router, prefix=settings.API_V1_STR)
+app.include_router(conversations_router, prefix=settings.API_V1_STR)
 
 @app.get("/", tags=["Health Check"])
 def health_check():

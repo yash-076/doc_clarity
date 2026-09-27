@@ -13,6 +13,7 @@ export default function DocumentList({ documents, loading, error, onDocumentDele
   const [inspectDoc, setInspectDoc] = useState(null);
   const [searchDoc, setSearchDoc] = useState(null);
   const [qaDoc, setQaDoc] = useState(null);
+  const [qaInitialQuestion, setQaInitialQuestion] = useState(null);
   const [analysisDoc, setAnalysisDoc] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [processingId, setProcessingId] = useState(null);
@@ -294,7 +295,11 @@ export default function DocumentList({ documents, loading, error, onDocumentDele
       {qaDoc && (
         <DocumentQAModal
           document={qaDoc}
-          onClose={() => setQaDoc(null)}
+          initialQuestion={qaInitialQuestion}
+          onClose={() => {
+            setQaDoc(null);
+            setQaInitialQuestion(null);
+          }}
         />
       )}
 
@@ -302,6 +307,11 @@ export default function DocumentList({ documents, loading, error, onDocumentDele
         <DocumentAnalysisModal
           document={analysisDoc}
           onClose={() => setAnalysisDoc(null)}
+          onSelectQuestion={(qText) => {
+            setQaDoc(analysisDoc);
+            setQaInitialQuestion(qText);
+            setAnalysisDoc(null);
+          }}
         />
       )}
     </div>

@@ -91,4 +91,35 @@ export const documentApi = {
     const response = await apiClient.delete(`/documents/${id}`);
     return response.data;
   },
+
+  async generateSuggestedQuestions(id, forceRefresh = false) {
+    const response = await apiClient.post(`/documents/${id}/suggested-questions`, {
+      force_refresh: forceRefresh,
+    });
+    return response.data;
+  },
+
+  async fetchSuggestedQuestions(id) {
+    const response = await apiClient.get(`/documents/${id}/suggested-questions`);
+    return response.data;
+  },
+
+  async createConversation(id, title = null) {
+    const response = await apiClient.post(`/documents/${id}/conversations`, {
+      title,
+    });
+    return response.data;
+  },
+
+  async sendConversationMessage(conversationId, content) {
+    const response = await apiClient.post(`/conversations/${conversationId}/messages`, {
+      content,
+    });
+    return response.data;
+  },
+
+  async fetchConversation(conversationId) {
+    const response = await apiClient.get(`/conversations/${conversationId}`);
+    return response.data;
+  },
 };

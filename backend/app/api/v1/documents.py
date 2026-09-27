@@ -23,9 +23,17 @@ from app.schemas.analysis import (
     AnalysisRequest,
     DocumentAnalysisResponse
 )
+from app.schemas.guided import (
+    SuggestedQuestionsRequest,
+    SuggestedQuestionsResponse,
+    CreateConversationRequest,
+    ConversationResponse,
+)
 from app.services.document_service import DocumentService
 from app.services.rag_service import RAGService
 from app.services.analysis_service import DocumentAnalysisService
+from app.services.guided_question_service import GuidedQuestionService
+from app.services.conversation_service import ConversationService
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -184,6 +192,60 @@ def get_document_analysis(
     analysis_service = DocumentAnalysisService()
     return analysis_service.get_existing_analysis(db=db, document_id=document_id)
 
+@router.post(
+    "/{document_id}/suggested-questions",
+    response_model=SuggestedQuestionsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Generate or return cached suggested questions for document",
+    description="Proactively generates document-tailored, grounded suggested questions based on Phase 5 analysis and caches them in PostgreSQL."
+)
+async def generate_suggested_questions(
+    document_id: uuid.UUID,
+    req: Optional[SuggestedQuestionsRequest] = None,
+    db: Session = Depends(get_db)
+):
+    force_refresh = req.force_refresh if req else False
+    guided_service = GuidedQuestionService()
+    return await guided_service.get_or_generate_questions(
+        db=db,
+        document_id=document_id,
+        force_refresh=force_refresh
+    )
+
+@router.get(
+    "/{document_id}/suggested-questions",
+    response_model=SuggestedQuestionsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get cached suggested questions for document",
+    description="Retrieves existing cached suggested questions for a document from PostgreSQL without calling LLM."
+)
+def get_suggested_questions(
+    document_id: uuid.UUID,
+    db: Session = Depends(get_db)
+):
+    guided_service = GuidedQuestionService()
+    return guided_service.get_cached_questions(db=db, document_id=document_id)
+
+@router.post(
+    "/{document_id}/conversations",
+    response_model=ConversationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new conversation session for document",
+    description="Initializes a multi-turn conversation session tied to a specific document."
+)
+def create_conversation(
+    document_id: uuid.UUID,
+    req: Optional[CreateConversationRequest] = None,
+    db: Session = Depends(get_db)
+):
+    title = req.title if req else None
+    conv_service = ConversationService()
+    return conv_service.create_conversation(
+        db=db,
+        document_id=document_id,
+        title=title
+    )
+
 @router.delete(
     "/{document_id}",
     response_model=DocumentDeleteResponse,
@@ -198,3 +260,4 @@ async def delete_document(document_id: uuid.UUID, db: Session = Depends(get_db))
         message="Document, physical file, chunks, and vector embeddings deleted successfully.",
         id=document_id
     )
+
