@@ -9,12 +9,25 @@ from app.core.logging import logger
 from app.schemas.processing import ExtractedContent
 from app.services.extraction.base import DocumentExtractor
 
+import os
+
 class PDFExtractor(DocumentExtractor):
     """PDF Extractor supporting PyMuPDF native extraction with automatic Tesseract OCR fallback."""
 
     def __init__(self):
         if settings.TESSERACT_CMD:
             pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
+        else:
+            # Check common Windows default installation paths
+            possible_paths = [
+                r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+                os.path.expanduser(r"~\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"),
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    pytesseract.pytesseract.tesseract_cmd = path
+                    break
 
     def extract(self, file_path: str) -> List[ExtractedContent]:
         extracted_elements: List[ExtractedContent] = []
