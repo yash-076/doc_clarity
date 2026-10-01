@@ -91,13 +91,16 @@ class GeminiLLMService(LLMService):
                     continue
 
         # If all candidates failed
-        logger.error(f"All Gemini models failed. Last error: {str(last_error)}")
-        if last_error and "quota" in str(last_error).lower() or "429" in str(last_error):
+        logger.error(f"All Gemini candidate models failed. Detailed technical exception: {repr(last_error)}")
+
+        if last_error and ("quota" in str(last_error).lower() or "429" in str(last_error)):
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Gemini API rate limit or quota exceeded. Please wait a moment and try again."
+                detail="Gemini service is experiencing high load or quota limits. Please try again in a moment."
             )
+        
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Gemini service failed to generate response: {str(last_error) if last_error else 'Unknown error'}"
+            detail="Unable to generate response from document intelligence service. Please check configuration or try again shortly."
         )
+

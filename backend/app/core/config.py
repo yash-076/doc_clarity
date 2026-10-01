@@ -76,6 +76,24 @@ class Settings(BaseSettings):
     MAX_CONVERSATION_MESSAGES: int = 10
     MAX_CONVERSATION_CONTEXT_CHARS: int = 6000
 
+    # Phase 8: Advanced Retrieval, Hybrid Search & Reranking Settings
+    RETRIEVAL_MODE: str = "hybrid"  # "vector", "keyword", "hybrid"
+    VECTOR_CANDIDATE_K: int = 15
+    KEYWORD_CANDIDATE_K: int = 15
+    FINAL_TOP_K: int = 5
+    VECTOR_SEARCH_WEIGHT: float = 0.7
+    KEYWORD_SEARCH_WEIGHT: float = 0.3
+    RRF_K: int = 60
+    HYBRID_FUSION_METHOD: str = "weighted"  # "weighted" or "rrf"
+
+    RERANKER_ENABLED: bool = True
+    RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    RERANKER_CANDIDATE_LIMIT: int = 30
+    RERANKER_TOP_K: int = 5
+
+    QUERY_EXPANSION_ENABLED: bool = False
+    DIVERSITY_SELECTION_ENABLED: bool = True
+
     @property
     def fallback_models_list(self) -> list[str]:
         if not self.GEMINI_FALLBACK_MODELS:

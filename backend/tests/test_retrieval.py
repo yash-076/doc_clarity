@@ -1,5 +1,5 @@
 import io
-import fitz
+import pymupdf as fitz
 
 def test_full_indexing_and_search_api(client):
     # 1. Create a PDF document

@@ -1,7 +1,7 @@
 import io
 import uuid
 import pytest
-import fitz
+import pymupdf as fitz
 from app.core.config import settings
 
 def create_dummy_pdf():

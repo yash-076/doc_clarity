@@ -84,7 +84,7 @@ class GuidedQuestionService:
                 .order_by(DocumentQuestion.position.asc())
                 .all()
             )
-            if cached_questions:
+            if cached_questions and not self._is_generic_fallback(cached_questions):
                 logger.info(f"Returning {len(cached_questions)} cached suggested questions for document_id={document_id}")
                 return SuggestedQuestionsResponse(
                     document_id=document_id,
@@ -108,7 +108,11 @@ class GuidedQuestionService:
             user_prompt=user_prompt,
         )
 
-        questions_list = self._parse_and_deduplicate_questions(raw_llm_response)
+        questions_list = self._parse_and_deduplicate_questions(
+            raw_text=raw_llm_response,
+            analysis=analysis_resp,
+            document=document,
+        )
 
         # 5. Clear old questions for this document and store new ones
         db.query(DocumentQuestion).filter(DocumentQuestion.document_id == document_id).delete()
@@ -141,19 +145,16 @@ class GuidedQuestionService:
             ]
         )
 
-    def get_cached_questions(self, db: Session, document_id: uuid.UUID) -> SuggestedQuestionsResponse:
-        """Retrieves existing cached questions for a document."""
+    async def get_cached_questions(self, db: Session, document_id: uuid.UUID) -> SuggestedQuestionsResponse:
+        """Retrieves existing cached questions for a document, auto-refreshing if generic fallback was stored."""
         questions = (
             db.query(DocumentQuestion)
             .filter(DocumentQuestion.document_id == document_id)
             .order_by(DocumentQuestion.position.asc())
             .all()
         )
-        if not questions:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No suggested questions found for document ID {document_id}."
-            )
+        if not questions or self._is_generic_fallback(questions):
+            return await self.get_or_generate_questions(db=db, document_id=document_id, force_refresh=True)
 
         analysis_version = questions[0].analysis_version if questions else 1
         return SuggestedQuestionsResponse(
@@ -168,6 +169,23 @@ class GuidedQuestionService:
                 for idx, q in enumerate(questions)
             ]
         )
+
+    def _is_generic_fallback(self, questions: list) -> bool:
+        """Checks if questions list contains generic fallback templates."""
+        generic_phrases = [
+            "coverage scope or primary terms",
+            "conditions, limitations, or exclusions",
+            "important deadlines or dates specified",
+            "monetary amounts, fees, or penalties",
+            "primary obligations or responsibilities",
+            "termination or claim rejection",
+        ]
+        for q in questions:
+            q_text = (getattr(q, "question", str(q)) or "").lower()
+            if any(phrase in q_text for phrase in generic_phrases):
+                return True
+        return False
+
 
     def _build_generation_prompt(self, document: Document, analysis: Any) -> str:
         """Constructs context prompt from Phase 5 analysis."""
@@ -205,44 +223,57 @@ KEY POINTS:
 {chr(10).join(key_points) if key_points else 'None'}
 
 INSTRUCTIONS:
-Generate exactly {settings.SUGGESTED_QUESTION_COUNT} useful, document-grounded questions targeting key coverage, exclusions, deadlines, financial obligations, or attention items from the analysis.
-Return JSON format: {{"questions": [{{"id": "q1", "question": "...", "category": "..."}}]}}"""
+Generate exactly {settings.SUGGESTED_QUESTION_COUNT} useful, document-grounded questions targeting specific facts, clauses, exclusions, deadlines, or amounts mentioned above in '{document.original_filename}'.
+Include specific terms or clause details from the document in each question.
+Return JSON format ONLY: {{"questions": [{{"id": "q1", "question": "...", "category": "..."}}]}}"""
         return prompt
 
-    def _parse_and_deduplicate_questions(self, raw_text: str) -> list[dict[str, str]]:
-        """Parses LLM output and deduplicates questions."""
+    def _parse_and_deduplicate_questions(
+        self,
+        raw_text: str,
+        analysis: Any = None,
+        document: Any = None
+    ) -> list[dict[str, str]]:
+        """Parses LLM output using robust regex and generates document-specific dynamic questions."""
         cleaned = raw_text.strip()
-        if cleaned.startswith("```json"):
-            cleaned = cleaned[7:]
-        if cleaned.startswith("```"):
-            cleaned = cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
-
         parsed_list = []
-        try:
-            data = json.loads(cleaned)
-            raw_qs = data.get("questions", [])
-            for item in raw_qs:
-                if isinstance(item, dict) and "question" in item:
-                    parsed_list.append({
-                        "question": item["question"].strip(),
-                        "category": item.get("category", "overview").strip().lower()
-                    })
-        except Exception as e:
-            logger.error(f"Failed to parse question generation JSON: {str(e)}")
 
-        # Fallback default questions if parsing fails
+        # Robust JSON extraction using regex pattern matching
+        import re
+        json_match = re.search(r'(\{.*"questions".*\})', cleaned, re.DOTALL)
+        if json_match:
+            try:
+                data = json.loads(json_match.group(1))
+                raw_qs = data.get("questions", [])
+                for item in raw_qs:
+                    if isinstance(item, dict) and "question" in item:
+                        parsed_list.append({
+                            "question": item["question"].strip(),
+                            "category": item.get("category", "overview").strip().lower()
+                        })
+            except Exception as e:
+                logger.warning(f"Regex extracted JSON parse failed: {str(e)}")
+
         if not parsed_list:
-            parsed_list = [
-                {"question": "What are the main coverage scope or primary terms in this document?", "category": "coverage"},
-                {"question": "What conditions, limitations, or exclusions are explicitly mentioned?", "category": "exclusions"},
-                {"question": "What are the important deadlines or dates specified?", "category": "deadlines"},
-                {"question": "What monetary amounts, fees, or penalties apply?", "category": "financial"},
-                {"question": "What primary obligations or responsibilities are assigned to each party?", "category": "obligations"},
-                {"question": "What conditions could result in termination or claim rejection?", "category": "termination"},
-            ]
+            # Fallback simple stripping
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:]
+            if cleaned.startswith("```"):
+                cleaned = cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            try:
+                data = json.loads(cleaned.strip())
+                raw_qs = data.get("questions", [])
+                for item in raw_qs:
+                    if isinstance(item, dict) and "question" in item:
+                        parsed_list.append({
+                            "question": item["question"].strip(),
+                            "category": item.get("category", "overview").strip().lower()
+                        })
+            except Exception as e:
+                logger.error(f"Failed to parse question generation JSON: {str(e)}")
+
 
         # Deduplicate by lowercase question string
         seen = set()
@@ -254,3 +285,4 @@ Return JSON format: {{"questions": [{{"id": "q1", "question": "...", "category":
                 deduped.append(item)
 
         return deduped[:settings.MAX_SUGGESTED_QUESTIONS]
+

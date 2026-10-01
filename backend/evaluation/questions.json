@@ -1,0 +1,66 @@
+[
+  {
+    "id": "eval-001",
+    "document_id": "00000000-0000-0000-0000-000000000001",
+    "question": "What is the waiting period for pre-existing conditions?",
+    "relevant_chunk_ids": ["c0000000-0000-0000-0000-000000000001"],
+    "category": "exclusion",
+    "expected_section": "Section 8"
+  },
+  {
+    "id": "eval-002",
+    "document_id": "00000000-0000-0000-0000-000000000001",
+    "question": "What is written in Section 8.2?",
+    "relevant_chunk_ids": ["c0000000-0000-0000-0000-000000000001", "c0000000-0000-0000-0000-000000000002"],
+    "category": "section reference",
+    "expected_section": "Section 8.2"
+  },
+  {
+    "id": "eval-003",
+    "document_id": "00000000-0000-0000-0000-000000000001",
+    "question": "What happens if I fail to pay the premium within 30 days?",
+    "relevant_chunk_ids": ["c0000000-0000-0000-0000-000000000003"],
+    "category": "obligation",
+    "expected_section": "Payment Terms"
+  },
+  {
+    "id": "eval-004",
+    "document_id": "00000000-0000-0000-0000-000000000001",
+    "question": "What is the maximum claim amount cap of ₹25,000?",
+    "relevant_chunk_ids": ["c0000000-0000-0000-0000-000000000004"],
+    "category": "numerical information",
+    "expected_section": "Claim Caps"
+  },
+  {
+    "id": "eval-005",
+    "document_id": "00000000-0000-0000-0000-000000000001",
+    "question": "How long is the written notice requirement for agreement termination?",
+    "relevant_chunk_ids": ["c0000000-0000-0000-0000-000000000005"],
+    "category": "date",
+    "expected_section": "Termination"
+  },
+  {
+    "id": "eval-006",
+    "document_id": "00000000-0000-0000-0000-000000000001",
+    "question": "Which medical expenses are excluded under Section 4?",
+    "relevant_chunk_ids": ["c0000000-0000-0000-0000-000000000006"],
+    "category": "exact terminology",
+    "expected_section": "Section 4"
+  },
+  {
+    "id": "eval-007",
+    "document_id": "00000000-0000-0000-0000-000000000001",
+    "question": "What happens if I stop paying?",
+    "relevant_chunk_ids": ["c0000000-0000-0000-0000-000000000003"],
+    "category": "semantic question",
+    "expected_section": "Payment Terms"
+  },
+  {
+    "id": "eval-008",
+    "document_id": "00000000-0000-0000-0000-000000000001",
+    "question": "What are the hospital room rent daily sub-limits?",
+    "relevant_chunk_ids": ["c0000000-0000-0000-0000-000000000007"],
+    "category": "direct fact lookup",
+    "expected_section": "Benefits"
+  }
+]

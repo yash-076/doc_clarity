@@ -1,5 +1,5 @@
 import io
-import fitz
+import pymupdf as fitz
 import docx
 from app.services.extraction.pdf_extractor import PDFExtractor
 from app.services.extraction.docx_extractor import DOCXExtractor

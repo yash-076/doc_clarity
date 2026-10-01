@@ -16,12 +16,18 @@ class RetrievalResult(BaseModel):
     section: Optional[str] = None
     document_type: str
     extraction_method: str
+    vector_score: Optional[float] = None
+    keyword_score: Optional[float] = None
+    rerank_score: Optional[float] = None
 
 class RetrievalResponse(BaseModel):
     query: str
     document_id: UUID
     top_k: int
     results: List[RetrievalResult]
+    retrieval_mode: Optional[str] = "hybrid"
+    latency_ms: Optional[dict] = None
+
 
 class IndexStatusResponse(BaseModel):
     document_id: UUID

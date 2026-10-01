@@ -243,15 +243,16 @@ async def generate_suggested_questions(
     "/{document_id}/suggested-questions",
     response_model=SuggestedQuestionsResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get cached suggested questions for document",
-    description="Retrieves existing cached suggested questions for a document from PostgreSQL without calling LLM."
+    summary="Get suggested questions for document",
+    description="Retrieves suggested questions for a document from PostgreSQL, auto-refreshing if generic fallback was stored."
 )
-def get_suggested_questions(
+async def get_suggested_questions(
     document_id: uuid.UUID,
     db: Session = Depends(get_db)
 ):
     guided_service = GuidedQuestionService()
-    return guided_service.get_cached_questions(db=db, document_id=document_id)
+    return await guided_service.get_cached_questions(db=db, document_id=document_id)
+
 
 @router.post(
     "/{document_id}/conversations",

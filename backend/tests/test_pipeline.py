@@ -1,5 +1,5 @@
 import io
-import fitz
+import pymupdf as fitz
 
 def test_pipeline_processing_and_chunks(client):
     # Create valid native PDF

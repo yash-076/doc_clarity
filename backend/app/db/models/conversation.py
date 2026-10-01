@@ -14,6 +14,7 @@ class Conversation(Base):
         GUID(),
         primary_key=True,
         default=uuid.uuid4
+        
     )
     document_id: Mapped[uuid.UUID] = mapped_column(
         GUID(),

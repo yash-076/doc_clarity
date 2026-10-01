@@ -1,5 +1,5 @@
 import io
-import fitz  # PyMuPDF
+import pymupdf as fitz  # PyMuPDF
 import pytesseract
 from PIL import Image
 from typing import List
